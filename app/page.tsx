@@ -1,95 +1,112 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client" 
+import { useEffect, useState, FormEvent } from "react"
+import { supabase } from "@/lib/supabase"
+import toast, { Toaster } from "react-hot-toast"
+import Swal from "sweetalert2"
+import "sweetalert2/dist/sweetalert2.min.css"
+
+interface Student {
+  id?: string;
+  name: string;
+  email: string;
+  phone_number: string;
+  gender: string;
+}
 
 export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>app/page.tsx</code>.
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
 
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
+  const [student, setStudents] = useState<Student[]>([]);
+  const[form, setForm] = useState<Student>({
+    name: "",
+    email: "",
+    phone_number: "",
+    gender: "Male"
+  })
+
+  const [editId, setEditId] = useState<string | null>(null);
+
+  async function handleFormSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    console.log(form);
+
+    const {error} = await supabase.from("Students").insert([form]);
+    if(error) {
+      toast.error(`Failed to add student: ${error.message}`);
+    } else {
+      toast.success("Student added successfully");
+    }
+    setForm({
+        name: "",
+        email: "",
+        phone_number: "",
+        gender: "Male"
+      });
+}      
+
+  return (
+    <>
+      <div className="container my-5">
+        <Toaster />
+        <h3 className="mb-4">Student Management</h3>
+        <div className="row">
+          <div className="col-md-4">
+            <div className="card mb-4">
+              <div className="card-body">
+                <form onSubmit={ handleFormSubmit }>
+                  <div className="mb-3">
+                    <label className="form-label">Name</label>
+                    <input type="text" className="form-control" value={ form.name } onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Email</label>
+                    <input type="email" className="form-control" value={ form.email } onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Phone Number</label>
+                    <input type="text" className="form-control" value={ form.phone_number } onChange={(e) => setForm({ ...form, phone_number: e.target.value })} />
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Gender</label>
+                    <select className="form-select" value={ form.gender } onChange={(e) => setForm({ ...form, gender: e.target.value })}>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <button type="submit" className="btn btn-primary w-100">Add Student</button>
+                </form>
+              </div>
+            </div>
+          </div>
+          <div className="col-md-8">
+            <div className="table-responsive">
+              <table className="table table-bordered">
+                <thead className="table-light">
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone Number</th>
+                    <th>Gender</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Rushikesh Sapkal</td>
+                    <td>rushi@example.com</td>
+                    <td>1234567890</td>
+                    <td>Male</td>
+                    <td>
+                      <button className="btn btn-sm btn-primary me-2">Edit</button>
+                      <button className="btn btn-sm btn-danger">Delete</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+      </div>
+    </>
+  )
 }
