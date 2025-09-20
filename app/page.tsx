@@ -28,19 +28,37 @@ export default function Home() {
   async function handleFormSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     console.log(form);
+    if(editId) {
+      //Update
+      const {error} = await supabase.from("Students").update([ form ]).eq("id", editId);
+      if(error) {
+        toast.error(`Failed to update student: ${error.message}`);
+      } else {
+        toast.success("Student updated successfully");
+        setEditId(null); 
+        setForm({
+          name: "",
+          email: "",
+          phone_number: "",
+          gender: "Male"
+        });
 
+      }
+    } else {
     const {error} = await supabase.from("Students").insert([form]);
     if(error) {
       toast.error(`Failed to add student: ${error.message}`);
     } else {
       toast.success("Student added successfully");
-    }
-    setForm({
+      setForm({
         name: "",
         email: "",
         phone_number: "",
         gender: "Male"
       });
+    }
+    }
+    fetchStudents();
   }
   
   async function fetchStudents() {
@@ -55,6 +73,36 @@ export default function Home() {
   useEffect(() => {
     fetchStudents();
   }, []);
+
+  function handleStudentEdit(student: Student) {
+    setForm(student);
+    if(student.id) {
+      setEditId(student.id);
+    }
+    
+  }
+
+  async function handleStudentDelete(student: Student) {
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: "You won't be able to revert this!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Yes, delete it!'
+    });
+
+    if (result.isConfirmed && student.id) {
+      const { error } = await supabase.from("Students").delete().eq("id", student.id);
+      if (error) {
+        toast.error(`Failed to delete student: ${error.message}`);
+      } else {
+        toast.success("Student deleted successfully");
+        fetchStudents();
+      }
+    }
+  }
 
   return (
     <>
@@ -86,7 +134,9 @@ export default function Home() {
                       <option value="other">Other</option>
                     </select>
                   </div>
-                  <button type="submit" className="btn btn-primary w-100">Add Student</button>
+                  <button type="submit" className="btn btn-primary w-100">
+                    { editId ? "Update" : "Add" } Student
+                  </button>
                 </form>
               </div>
             </div>
@@ -105,14 +155,14 @@ export default function Home() {
                 </thead>
                 <tbody>
                   {student.map((student) => (
-                    <tr>
+                    <tr key={student.id}>
                     <td>{student.name}</td>
                     <td>{student.email}</td>
                     <td>{student.phone_number}</td>
                     <td>{student.gender}</td>
                     <td>
-                      <button className="btn btn-sm btn-primary me-2">Edit</button>
-                      <button className="btn btn-sm btn-danger">Delete</button>
+                      <button className="btn btn-sm btn-primary me-2" onClick={() => handleStudentEdit(student)}>Edit</button>
+                      <button className="btn btn-sm btn-danger" onClick={() => handleStudentDelete(student)}>Delete</button>
                     </td>
                   </tr>
                   ))}
