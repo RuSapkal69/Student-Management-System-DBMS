@@ -41,7 +41,20 @@ export default function Home() {
         phone_number: "",
         gender: "Male"
       });
-}      
+  }
+  
+  async function fetchStudents() {
+    const {data, error} = await supabase.from("Students").select("*");
+    if(error) {
+      toast.error(`Failed to fetch students: ${error.message}`);
+    } else {
+      setStudents(data || []);
+    }
+  }
+  
+  useEffect(() => {
+    fetchStudents();
+  }, []);
 
   return (
     <>
@@ -91,16 +104,18 @@ export default function Home() {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td>Rushikesh Sapkal</td>
-                    <td>rushi@example.com</td>
-                    <td>1234567890</td>
-                    <td>Male</td>
+                  {student.map((student) => (
+                    <tr>
+                    <td>{student.name}</td>
+                    <td>{student.email}</td>
+                    <td>{student.phone_number}</td>
+                    <td>{student.gender}</td>
                     <td>
                       <button className="btn btn-sm btn-primary me-2">Edit</button>
                       <button className="btn btn-sm btn-danger">Delete</button>
                     </td>
                   </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
