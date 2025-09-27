@@ -5,9 +5,9 @@ import { supabase } from "@/lib/supabase"
 import toast from "react-hot-toast"
 
 interface Transaction {
-  id: string
-  student_id: string
-  book_id: string
+  id: number      // Changed from string to number
+  student_id: number  // Changed from string to number
+  book_id: number     // Changed from string to number
   issue_date: string
   due_date: string
   return_date?: string
@@ -51,7 +51,7 @@ export default function FineCalculation() {
     return Math.max(0, diffDays * fineRate)
   }
 
-  async function applyFine(transactionId: string, fineAmount: number) {
+  async function applyFine(transactionId: number, fineAmount: number) {
     const { error } = await supabase
       .from("Transactions")
       .update({ fine_amount: fineAmount })

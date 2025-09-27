@@ -4,23 +4,24 @@ import { useEffect, useState, FormEvent } from "react"
 import { supabase } from "@/lib/supabase"
 import toast from "react-hot-toast"
 
+// Update interfaces
 interface Student {
-  id: string
+  id: number  // Changed from string to number
   name: string
   email: string
 }
 
 interface Book {
-  id: string
+  id: number  // Changed from string to number
   title: string
   author: string
   available_copies: number
 }
 
 interface Transaction {
-  id?: string
-  student_id: string
-  book_id: string
+  id?: number  // Changed from string to number
+  student_id: number  // Changed from string to number
+  book_id: number    // Changed from string to number
   issue_date: string
   return_date?: string
   due_date: string
@@ -29,6 +30,8 @@ interface Transaction {
   students: { name: string }
   books: { title: string; author: string }
 }
+
+// Rest of the component remains the same...
 
 export default function IssueReturn() {
   const [students, setStudents] = useState<Student[]>([])
@@ -109,7 +112,7 @@ export default function IssueReturn() {
       toast.error(`Failed to issue book: ${error.message}`)
     } else {
       // Update available copies
-      const book = books.find(b => b.id === form.book_id)
+      const book = books.find(b => b.id === Number(form.book_id))
       if (book) {
         await supabase
           .from("Books")
@@ -124,39 +127,39 @@ export default function IssueReturn() {
     }
   }
 
-  async function handleReturnBook(transactionId: string, bookId: string) {
-    const returnDate = new Date().toISOString().split('T')[0]
-    
-    const { error } = await supabase
-      .from("Transactions")
-      .update({
-        return_date: returnDate,
-        status: 'returned'
-      })
-      .eq("id", transactionId)
-
-    if (error) {
-      toast.error(`Failed to return book: ${error.message}`)
-    } else {
-      // Update available copies
-      const { data: bookData } = await supabase
-        .from("Books")
-        .select("available_copies")
-        .eq("id", bookId)
-        .single()
-
-      if (bookData) {
-        await supabase
+  async function handleReturnBook(transactionId: number, bookId: number) {
+      const returnDate = new Date().toISOString().split('T')[0]
+      
+      const { error } = await supabase
+        .from("Transactions")
+        .update({
+          return_date: returnDate,
+          status: 'returned'
+        })
+        .eq("id", transactionId)
+  
+      if (error) {
+        toast.error(`Failed to return book: ${error.message}`)
+      } else {
+        // Update available copies
+        const { data: bookData } = await supabase
           .from("Books")
-          .update({ available_copies: bookData.available_copies + 1 })
+          .select("available_copies")
           .eq("id", bookId)
+          .single()
+  
+        if (bookData) {
+          await supabase
+            .from("Books")
+            .update({ available_copies: bookData.available_copies + 1 })
+            .eq("id", bookId)
+        }
+  
+        toast.success("Book returned successfully")
+        fetchBooks()
+        fetchTransactions()
       }
-
-      toast.success("Book returned successfully")
-      fetchBooks()
-      fetchTransactions()
     }
-  }
 
   return (
     <div className="space-y-6">
@@ -273,7 +276,7 @@ export default function IssueReturn() {
                   </td>
                   <td className="border border-gray-300 dark:border-gray-600 px-4 py-2">
                     <button
-                      onClick={() => handleReturnBook(transaction.id!, transaction.book_id)}
+                      onClick={() => handleReturnBook(transaction.id as number, transaction.book_id as number)}
                       className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 transition-colors"
                     >
                       Return

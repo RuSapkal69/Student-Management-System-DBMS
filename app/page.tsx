@@ -22,7 +22,7 @@ export default function Home() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-2">
+          <h1 className="text-4xl font-bold text-red-800 dark:text-white mb-2">
             📖 Library Management System
           </h1>
           <p className="text-gray-600 dark:text-gray-300">
@@ -38,25 +38,30 @@ export default function Home() {
               onClick={() => setActiveTab(tab.id)}
               className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 ${
                 activeTab === tab.id
-                  ? "bg-blue-600 text-white shadow-lg"
-                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700"
+                  ? "bg-blue-600 text-white shadow-lg transform scale-105"
+                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:scale-105"
               }`}
             >
-              <span>{tab.icon}</span>
-              {tab.label}
+              <span className="text-lg">{tab.icon}</span>
+              <span className="hidden sm:inline">{tab.label}</span>
             </button>
           ))}
         </div>
 
         {/* Tab Content */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
           {activeTab === "students" && <StudentManagement />}
           {activeTab === "books" && <BookManagement />}
           {activeTab === "issue-return" && <IssueReturn />}
           {activeTab === "fines" && <FineCalculation />}
         </div>
       </div>
-      <Toaster position="top-right" />
+      <Toaster 
+        position="top-right" 
+        toastOptions={{
+          className: 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white',
+        }}
+      />
     </div>
   )
 }
