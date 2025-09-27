@@ -1,177 +1,62 @@
-"use client" 
-import { useEffect, useState, FormEvent } from "react"
-import { supabase } from "@/lib/supabase"
-import toast, { Toaster } from "react-hot-toast"
-import Swal from "sweetalert2"
-import "sweetalert2/dist/sweetalert2.min.css"
+"use client"
 
-interface Student {
-  id?: string;
-  name: string;
-  email: string;
-  phone_number: string;
-  gender: string;
-}
+import { useState } from "react"
+import StudentManagement from "./components/StudentManagement"
+import BookManagement from "./components/BookManagement"
+import IssueReturn from "./components/IssueReturn"
+import FineCalculation from "./components/FineCalculation"
+import { Toaster } from "react-hot-toast"
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState("students")
 
-  const [student, setStudents] = useState<Student[]>([]);
-  const[form, setForm] = useState<Student>({
-    name: "",
-    email: "",
-    phone_number: "",
-    gender: "Male"
-  })
-
-  const [editId, setEditId] = useState<string | null>(null);
-
-  async function handleFormSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    console.log(form);
-    if(editId) {
-      //Update
-      const {error} = await supabase.from("Students").update([ form ]).eq("id", editId);
-      if(error) {
-        toast.error(`Failed to update student: ${error.message}`);
-      } else {
-        toast.success("Student updated successfully");
-        setEditId(null); 
-        setForm({
-          name: "",
-          email: "",
-          phone_number: "",
-          gender: "Male"
-        });
-
-      }
-    } else {
-    const {error} = await supabase.from("Students").insert([form]);
-    if(error) {
-      toast.error(`Failed to add student: ${error.message}`);
-    } else {
-      toast.success("Student added successfully");
-      setForm({
-        name: "",
-        email: "",
-        phone_number: "",
-        gender: "Male"
-      });
-    }
-    }
-    fetchStudents();
-  }
-  
-  async function fetchStudents() {
-    const {data, error} = await supabase.from("Students").select("*");
-    if(error) {
-      toast.error(`Failed to fetch students: ${error.message}`);
-    } else {
-      setStudents(data || []);
-    }
-  }
-  
-  useEffect(() => {
-    fetchStudents();
-  }, []);
-
-  function handleStudentEdit(student: Student) {
-    setForm(student);
-    if(student.id) {
-      setEditId(student.id);
-    }
-    
-  }
-
-  async function handleStudentDelete(student: Student) {
-    const result = await Swal.fire({
-      title: 'Are you sure?',
-      text: "You won't be able to revert this!",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#3085d6',
-      cancelButtonColor: '#d33',
-      confirmButtonText: 'Yes, delete it!'
-    });
-
-    if (result.isConfirmed && student.id) {
-      const { error } = await supabase.from("Students").delete().eq("id", student.id);
-      if (error) {
-        toast.error(`Failed to delete student: ${error.message}`);
-      } else {
-        toast.success("Student deleted successfully");
-        fetchStudents();
-      }
-    }
-  }
+  const tabs = [
+    { id: "students", label: "Students", icon: "👥" },
+    { id: "books", label: "Books", icon: "📚" },
+    { id: "issue-return", label: "Issue/Return", icon: "🔄" },
+    { id: "fines", label: "Fines", icon: "💰" }
+  ]
 
   return (
-    <>
-      <div className="container my-5">
-        <Toaster />
-        <h3 className="mb-4">Student Management</h3>
-        <div className="row">
-          <div className="col-md-4">
-            <div className="card mb-4">
-              <div className="card-body">
-                <form onSubmit={ handleFormSubmit }>
-                  <div className="mb-3">
-                    <label className="form-label">Name</label>
-                    <input type="text" className="form-control" value={ form.name } onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label">Email</label>
-                    <input type="email" className="form-control" value={ form.email } onChange={(e) => setForm({ ...form, email: e.target.value })} />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label">Phone Number</label>
-                    <input type="text" className="form-control" value={ form.phone_number } onChange={(e) => setForm({ ...form, phone_number: e.target.value })} />
-                  </div>
-                  <div className="mb-3">
-                    <label className="form-label">Gender</label>
-                    <select className="form-select" value={ form.gender } onChange={(e) => setForm({ ...form, gender: e.target.value })}>
-                      <option value="male">Male</option>
-                      <option value="female">Female</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-                  <button type="submit" className="btn btn-primary w-100">
-                    { editId ? "Update" : "Add" } Student
-                  </button>
-                </form>
-              </div>
-            </div>
-          </div>
-          <div className="col-md-8">
-            <div className="table-responsive">
-              <table className="table table-bordered">
-                <thead className="table-light">
-                  <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Phone Number</th>
-                    <th>Gender</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {student.map((student) => (
-                    <tr key={student.id}>
-                    <td>{student.name}</td>
-                    <td>{student.email}</td>
-                    <td>{student.phone_number}</td>
-                    <td>{student.gender}</td>
-                    <td>
-                      <button className="btn btn-sm btn-primary me-2" onClick={() => handleStudentEdit(student)}>Edit</button>
-                      <button className="btn btn-sm btn-danger" onClick={() => handleStudentDelete(student)}>Delete</button>
-                    </td>
-                  </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-2">
+            📖 Library Management System
+          </h1>
+          <p className="text-gray-600 dark:text-gray-300">
+            Manage books, students, and library operations efficiently
+          </p>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className="flex flex-wrap justify-center gap-2 mb-8">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 ${
+                activeTab === tab.id
+                  ? "bg-blue-600 text-white shadow-lg"
+                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700"
+              }`}
+            >
+              <span>{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab Content */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6">
+          {activeTab === "students" && <StudentManagement />}
+          {activeTab === "books" && <BookManagement />}
+          {activeTab === "issue-return" && <IssueReturn />}
+          {activeTab === "fines" && <FineCalculation />}
         </div>
       </div>
-    </>
+      <Toaster position="top-right" />
+    </div>
   )
 }
