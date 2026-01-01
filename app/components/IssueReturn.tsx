@@ -26,8 +26,8 @@ interface Transaction {
   due_date: string
   status: 'issued' | 'returned'
   fine_amount?: number
-  students: { name: string }
-  books: { title: string; author: string }
+  Students?: { name: string }  // Capital S to match your table
+  Books?: { title: string; author: string }  // Capital B to match your table
 }
 
 export default function IssueReturn() {
@@ -43,11 +43,12 @@ export default function IssueReturn() {
 
   async function fetchStudents() {
     const { data, error } = await supabase
-      .from("Students")
+      .from("Students")  // Use exact table name
       .select("id, name, email")
       .order('name')
 
     if (error) {
+      console.error('Students fetch error:', error)
       toast.error(`Failed to fetch students: ${error.message}`)
     } else {
       setStudents(data || [])
@@ -56,12 +57,13 @@ export default function IssueReturn() {
 
   async function fetchBooks() {
     const { data, error } = await supabase
-      .from("Books")
+      .from("Books")  // Use exact table name
       .select("id, title, author, available_copies")
       .gt('available_copies', 0)
       .order('title')
 
     if (error) {
+      console.error('Books fetch error:', error)
       toast.error(`Failed to fetch books: ${error.message}`)
     } else {
       setBooks(data || [])
@@ -69,19 +71,67 @@ export default function IssueReturn() {
   }
 
   async function fetchTransactions() {
-    const { data, error } = await supabase
-      .from("Transactions")
-      .select(`
-        *,
-        students(name),
-        books(title, author)
-      `)
-      .order('issue_date', { ascending: false })
+    try {
+      // First, try to fetch with join
+      const { data, error } = await supabase
+        .from("Transactions")
+        .select(`
+          *,
+          Students(name),
+          Books(title, author)
+        `)
+        .order('issue_date', { ascending: false })
 
-    if (error) {
-      toast.error(`Failed to fetch transactions: ${error.message}`)
-    } else {
-      setTransactions(data || [])
+      if (error) {
+        console.error('Transactions join fetch error:', error)
+        // If join fails, fetch transactions separately and then get related data
+        await fetchTransactionsWithSeparateQueries()
+      } else {
+        setTransactions(data || [])
+      }
+    } catch (err) {
+      console.error('Fetch transactions error:', err)
+      await fetchTransactionsWithSeparateQueries()
+    }
+  }
+
+  async function fetchTransactionsWithSeparateQueries() {
+    try {
+      // Fetch transactions without joins
+      const { data: transactionsData, error: transError } = await supabase
+        .from("Transactions")
+        .select("*")
+        .order('issue_date', { ascending: false })
+
+      if (transError) {
+        toast.error(`Failed to fetch transactions: ${transError.message}`)
+        return
+      }
+
+      // Fetch all students and books
+      const { data: studentsData } = await supabase
+        .from("Students")
+        .select("id, name")
+
+      const { data: booksData } = await supabase
+        .from("Books")
+        .select("id, title, author")
+
+      // Create lookup maps
+      const studentMap = new Map(studentsData?.map(s => [s.id, s]) || [])
+      const bookMap = new Map(booksData?.map(b => [b.id, b]) || [])
+
+      // Combine data
+      const combinedTransactions = transactionsData?.map(transaction => ({
+        ...transaction,
+        Students: studentMap.get(transaction.student_id) || { name: 'Unknown Student' },
+        Books: bookMap.get(transaction.book_id) || { title: 'Unknown Book', author: 'Unknown Author' }
+      })) || []
+
+      setTransactions(combinedTransactions)
+    } catch (err) {
+      console.error('Separate queries error:', err)
+      toast.error('Failed to fetch transaction data')
     }
   }
 
@@ -95,69 +145,79 @@ export default function IssueReturn() {
     e.preventDefault()
     setLoading(true)
 
-    const issueDate = new Date().toISOString().split('T')[0]
-    
-    const { error } = await supabase
-      .from("Transactions")
-      .insert([{
-        student_id: parseInt(form.student_id),
-        book_id: parseInt(form.book_id),
-        issue_date: issueDate,
-        due_date: form.due_date,
-        status: 'issued'
-      }])
+    try {
+      const issueDate = new Date().toISOString().split('T')[0]
+      
+      const { error } = await supabase
+        .from("Transactions")
+        .insert([{
+          student_id: parseInt(form.student_id),
+          book_id: parseInt(form.book_id),
+          issue_date: issueDate,
+          due_date: form.due_date,
+          status: 'issued'
+        }])
 
-    if (error) {
-      toast.error(`Failed to issue book: ${error.message}`)
-    } else {
-      // Update available copies
-      const book = books.find(b => b.id === parseInt(form.book_id))
-      if (book) {
-        await supabase
-          .from("Books")
-          .update({ available_copies: book.available_copies - 1 })
-          .eq("id", form.book_id)
+      if (error) {
+        toast.error(`Failed to issue book: ${error.message}`)
+      } else {
+        // Update available copies
+        const book = books.find(b => b.id === parseInt(form.book_id))
+        if (book) {
+          await supabase
+            .from("Books")
+            .update({ available_copies: book.available_copies - 1 })
+            .eq("id", form.book_id)
+        }
+
+        toast.success("📚 Book issued successfully!")
+        setForm({ student_id: "", book_id: "", due_date: "" })
+        fetchBooks()
+        fetchTransactions()
       }
-
-      toast.success("📚 Book issued successfully!")
-      setForm({ student_id: "", book_id: "", due_date: "" })
-      fetchBooks()
-      fetchTransactions()
+    } catch (err) {
+      console.error('Issue book error:', err)
+      toast.error('Failed to issue book')
     }
     setLoading(false)
   }
 
   async function handleReturnBook(transactionId: number, bookId: number) {
-    const returnDate = new Date().toISOString().split('T')[0]
-    
-    const { error } = await supabase
-      .from("Transactions")
-      .update({
-        return_date: returnDate,
-        status: 'returned'
-      })
-      .eq("id", transactionId)
+    try {
+      const returnDate = new Date().toISOString().split('T')[0]
+      
+      const { error } = await supabase
+        .from("Transactions")
+        .update({
+          return_date: returnDate,
+          status: 'returned'
+        })
+        .eq("id", transactionId)
 
-    if (error) {
-      toast.error(`Failed to return book: ${error.message}`)
-    } else {
-      // Update available copies
-      const { data: bookData } = await supabase
-        .from("Books")
-        .select("available_copies")
-        .eq("id", bookId)
-        .single()
-
-      if (bookData) {
-        await supabase
+      if (error) {
+        toast.error(`Failed to return book: ${error.message}`)
+      } else {
+        // Update available copies
+        const { data: bookData } = await supabase
           .from("Books")
-          .update({ available_copies: bookData.available_copies + 1 })
+          .select("available_copies")
           .eq("id", bookId)
-      }
+          .single()
 
-      toast.success("✅ Book returned successfully!")
-      fetchBooks()
-      fetchTransactions()
+        if (bookData) {
+          await supabase
+            .from("Books")
+            .update({ available_copies: bookData.available_copies + 1 })
+            .eq("id", bookId)
+        }
+
+        toast.success("✅ Book returned successfully!")
+        fetchBooks()
+        fetchTransactions()
+      }
+    } catch (err) {
+      console.error('Return book error:', err)
+      toast.error('Failed to return book')
     }
   }
 
@@ -241,6 +301,7 @@ export default function IssueReturn() {
                 type="date"
                 required
                 value={form.due_date}
+                min={new Date().toISOString().split('T')[0]}
                 onChange={(e) => setForm({ ...form, due_date: e.target.value })}
                 className="w-full px-4 py-3 bg-white/50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 text-slate-800 dark:text-white"
               />
@@ -272,7 +333,7 @@ export default function IssueReturn() {
       <div className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-3xl overflow-hidden shadow-2xl border border-white/20">
         <div className="px-8 py-6 bg-gradient-to-r from-orange-100 to-red-100 dark:from-slate-700 dark:to-slate-600 border-b border-slate-200 dark:border-slate-600">
           <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-            📋 Currently Issued Books
+            📋 Currently Issued Books ({issuedTransactions.length})
           </h3>
         </div>
         
@@ -292,24 +353,33 @@ export default function IssueReturn() {
               {issuedTransactions.length > 0 ? (
                 issuedTransactions.map((transaction, index) => {
                   const isOverdue = new Date(transaction.due_date) < new Date()
+                  const studentName = transaction.Students?.name || 'Unknown Student'
+                  const bookTitle = transaction.Books?.title || 'Unknown Book'
+                  const bookAuthor = transaction.Books?.author || 'Unknown Author'
+                  
                   return (
                     <tr key={transaction.id} className={`hover:bg-orange-50 dark:hover:bg-slate-700/50 transition-all duration-300 ${index % 2 === 0 ? 'bg-white/50 dark:bg-slate-800/30' : 'bg-slate-50/50 dark:bg-slate-700/30'}`}>
                       <td className="px-8 py-6">
                         <div className="flex items-center space-x-3">
                           <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold">
-                            {transaction.students.name.charAt(0)}
+                            {studentName.charAt(0)}
                           </div>
-                          <div className="text-sm font-bold text-slate-900 dark:text-white">
-                            {transaction.students.name}
+                          <div>
+                            <div className="text-sm font-bold text-slate-900 dark:text-white">
+                              {studentName}
+                            </div>
+                            <div className="text-xs text-slate-600 dark:text-slate-400">
+                              ID: {transaction.student_id}
+                            </div>
                           </div>
                         </div>
                       </td>
                       <td className="px-8 py-6">
                         <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                          {transaction.books.title}
+                          {bookTitle}
                         </div>
                         <div className="text-xs text-slate-600 dark:text-slate-400">
-                          by {transaction.books.author}
+                          by {bookAuthor}
                         </div>
                       </td>
                       <td className="px-8 py-6 text-sm text-slate-600 dark:text-slate-300">

@@ -13,8 +13,8 @@ interface Transaction {
   return_date?: string
   status: string
   fine_amount?: number
-  students: { name: string; email: string }
-  books: { title: string; author: string }
+  Students?: { name: string; email: string }
+  Books?: { title: string; author: string }
 }
 
 export default function FineCalculation() {
@@ -22,20 +22,69 @@ export default function FineCalculation() {
   const [fineRate] = useState(2) // ₹2 per day
 
   async function fetchOverdueTransactions() {
-    const { data, error } = await supabase
-      .from("Transactions")
-      .select(`
-        *,
-        students(name, email),
-        books(title, author)
-      `)
-      .eq('status', 'issued')
-      .lt('due_date', new Date().toISOString().split('T')[0])
+    try {
+      // First try with joins
+      const { data, error } = await supabase
+        .from("Transactions")
+        .select(`
+          *,
+          Students(name, email),
+          Books(title, author)
+        `)
+        .eq('status', 'issued')
+        .lt('due_date', new Date().toISOString().split('T')[0])
 
-    if (error) {
-      toast.error(`Failed to fetch overdue transactions: ${error.message}`)
-    } else {
-      setOverdueTransactions(data || [])
+      if (error) {
+        console.error('Overdue transactions join error:', error)
+        // Fallback to separate queries
+        await fetchOverdueTransactionsWithSeparateQueries()
+      } else {
+        setOverdueTransactions(data || [])
+      }
+    } catch (err) {
+      console.error('Fetch overdue transactions error:', err)
+      await fetchOverdueTransactionsWithSeparateQueries()
+    }
+  }
+
+  async function fetchOverdueTransactionsWithSeparateQueries() {
+    try {
+      // Fetch overdue transactions
+      const { data: transactionsData, error: transError } = await supabase
+        .from("Transactions")
+        .select("*")
+        .eq('status', 'issued')
+        .lt('due_date', new Date().toISOString().split('T')[0])
+
+      if (transError) {
+        toast.error(`Failed to fetch overdue transactions: ${transError.message}`)
+        return
+      }
+
+      // Fetch students and books
+      const { data: studentsData } = await supabase
+        .from("Students")
+        .select("id, name, email")
+
+      const { data: booksData } = await supabase
+        .from("Books")
+        .select("id, title, author")
+
+      // Create lookup maps
+      const studentMap = new Map(studentsData?.map(s => [s.id, s]) || [])
+      const bookMap = new Map(booksData?.map(b => [b.id, b]) || [])
+
+      // Combine data
+      const combinedTransactions = transactionsData?.map(transaction => ({
+        ...transaction,
+        Students: studentMap.get(transaction.student_id) || { name: 'Unknown Student', email: 'unknown@email.com' },
+        Books: bookMap.get(transaction.book_id) || { title: 'Unknown Book', author: 'Unknown Author' }
+      })) || []
+
+      setOverdueTransactions(combinedTransactions)
+    } catch (err) {
+      console.error('Separate queries error:', err)
+      toast.error('Failed to fetch overdue transaction data')
     }
   }
 
@@ -128,7 +177,7 @@ export default function FineCalculation() {
       <div className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-3xl overflow-hidden shadow-2xl border border-white/20">
         <div className="px-8 py-6 bg-gradient-to-r from-red-100 to-amber-100 dark:from-slate-700 dark:to-slate-600 border-b border-slate-200 dark:border-slate-600">
           <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-            📋 Overdue Books & Fine Details
+            📋 Overdue Books & Fine Details ({overdueTransactions.length})
           </h3>
         </div>
         
@@ -152,20 +201,24 @@ export default function FineCalculation() {
                     (1000 * 60 * 60 * 24)
                   )
                   const fineAmount = calculateFine(transaction.due_date)
+                  const studentName = transaction.Students?.name || 'Unknown Student'
+                  const studentEmail = transaction.Students?.email || 'unknown@email.com'
+                  const bookTitle = transaction.Books?.title || 'Unknown Book'
+                  const bookAuthor = transaction.Books?.author || 'Unknown Author'
                   
                   return (
                     <tr key={transaction.id} className={`hover:bg-red-50 dark:hover:bg-slate-700/50 transition-all duration-300 ${index % 2 === 0 ? 'bg-white/50 dark:bg-slate-800/30' : 'bg-slate-50/50 dark:bg-slate-700/30'}`}>
                       <td className="px-8 py-6">
                         <div className="flex items-center space-x-4">
                           <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-red-400 via-pink-500 to-purple-500 flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                            {transaction.students.name.charAt(0)}
+                            {studentName.charAt(0)}
                           </div>
                           <div>
                             <div className="text-lg font-bold text-slate-900 dark:text-white">
-                              {transaction.students.name}
+                              {studentName}
                             </div>
                             <div className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-1">
-                              📧 {transaction.students.email}
+                              📧 {studentEmail}
                             </div>
                           </div>
                         </div>
@@ -173,10 +226,10 @@ export default function FineCalculation() {
                       <td className="px-8 py-6">
                         <div>
                           <div className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                            📚 {transaction.books.title}
+                            📚 {bookTitle}
                           </div>
                           <div className="text-sm text-slate-600 dark:text-slate-400">
-                            by {transaction.books.author}
+                            by {bookAuthor}
                           </div>
                         </div>
                       </td>
